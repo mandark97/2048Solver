@@ -1,4 +1,5 @@
 import sys
+from typing import Tuple
 
 import gym
 from gym import spaces
@@ -37,13 +38,16 @@ class GameEnv(gym.Env):
             self.score += score
             self._add_tile()
             done = self._game_finished()
-            reward = score
+            if done:
+                reward = GameEnv.final_state_reward(score)
+            else:
+                reward = score
         except IllegalMove as e:
             done = False
-            reward = 0.
+            reward = GameEnv.invalid_move_reward()
 
         observation = self.board
-        info = {"max_tile": self._highest()}
+        info = {"max_tile": self.highest()}
 
         return observation, reward, done, info
 
@@ -61,7 +65,7 @@ class GameEnv(gym.Env):
         board-matrix of game."""
         outfile = sys.stdout
         s = 'Score: {}\n'.format(self.score)
-        s += 'Highest: {}\n'.format(self._highest())
+        s += 'Highest: {}\n'.format(self.highest())
         npa = np.array(self.board)
         grid = npa.reshape((self.size, self.size))
         s += "{}\n".format(grid)
@@ -128,7 +132,7 @@ class GameEnv(gym.Env):
             # combine tiles
             if value_pair[0] == value_pair[1]:
                 new_line[index] += value_pair[1]
-                move_score += value_pair[0] + value_pair[1]
+                move_score += GameEnv.reward_function(value_pair)  # min(value_pair[0] / 4., 1.)
                 skip = True
 
             index += 1
@@ -136,6 +140,18 @@ class GameEnv(gym.Env):
             new_line[index] = tiles[-1]
 
         return (new_line, move_score, (new_line != board_line).any())
+
+    @staticmethod
+    def reward_function(value_pair: Tuple) -> float:
+        raise NotImplementedError
+
+    @staticmethod
+    def final_state_reward(score=None) -> float:
+        raise NotImplementedError
+
+    @staticmethod
+    def invalid_move_reward() -> float:
+        raise NotImplementedError
 
     def _flip_board(self, direction: int):
         if direction == self.LEFT:
@@ -147,5 +163,5 @@ class GameEnv(gym.Env):
         elif direction == self.DOWN:
             self.board = np.flip(self.board.T, 0)
 
-    def _highest(self):
+    def highest(self):
         return np.max(self.board)
