@@ -116,7 +116,7 @@ class Trainer(object):
             # display.display(plt.gcf())
 
         if save is not None:
-            plt.savefig(save)
+            plt.savefig(f"{save}.png")
 
     def optimize_model(self):
         if len(self.memory) < self.BATCH_SIZE:
@@ -191,7 +191,7 @@ class Trainer(object):
                         self.env.render()
                     self.episode_scores.append(self.env.score)
                     self.highest_scores.append(self.env.highest())
-                    self.plot_scores(i_episode)
+                    self.plot_scores()
                     break
             # Update the target network, copying all weights and biases in DQN
             if i_episode % self.TARGET_UPDATE == 0:

@@ -48,7 +48,7 @@ env = GameEnv()
 class DQN(nn.Module):
     def __init__(self, outputs):
         super(DQN, self).__init__()
-        self.fn1 = nn.Linear(4 * 4, 300)
+        self.fn1 = nn.Linear(4 * 16, 300)
         self.fn2 = nn.Linear(300, 300)
         self.fn3 = nn.Linear(300, 200)
         self.fn4 = nn.Linear(200, 200)
@@ -77,9 +77,16 @@ def get_state(self: Trainer):
         board = np.where(self.env.board != 0, np.log2(self.env.board), 0)
         return torch.from_numpy(np.ascontiguousarray(board)).unsqueeze(0).float().to(self.device)
 
+def state2(self, Trainer):
+    with np.errstate(divide='ignore'):
+        board = np.where(env.board != 0, np.log2(env.board).astype(np.int), 0)
+    board = np.vectorize(np.binary_repr)(board, width=4).astype(str)
+    board = np.array([list(''.join(line)) for line in board]).astype(np.int)
+    return torch.from_numpy(np.ascontiguousarray(board)).unsqueeze(0).float().to(self.device)
+
 # %%
 # define constants
-num_episodes = 10
+num_episodes = 3000
 BATCH_SIZE = 256
 GAMMA = 0.999
 EPS_START = 1.
@@ -89,10 +96,10 @@ TARGET_UPDATE = 50
 MEMORY_SIZE = 10000
 optimizer = optim.Adam
 optimizer_params = {"lr": 0.0001}
-
+run = "run2"
 # %%
 # define trainer
-writer = SummaryWriter("runs/run1")
+writer = SummaryWriter(f"runs/{run}")
 trainer = Trainer(memory_size=MEMORY_SIZE, batch_size=BATCH_SIZE, gamma=GAMMA, eps_start=EPS_START, eps_end=EPS_END,
                   eps_decay=EPS_DECAY, target_update=TARGET_UPDATE, env=env, model=DQN, optimizer_klass=optimizer,
                   optimizer_params=optimizer_params,
@@ -108,4 +115,4 @@ trainer.train(num_episodes)
 
 # %%
 print(Counter(trainer.get_highest_scores()))
-trainer.write_results("run1")
+trainer.write_results(run)
