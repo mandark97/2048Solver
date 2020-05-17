@@ -1,39 +1,14 @@
 import math
 import random
-from collections import namedtuple, Counter
 from itertools import count
 from typing import Optional, Dict
 
 import matplotlib.pyplot as plt
 import torch
 from IPython import display
-from torch.utils.tensorboard import SummaryWriter
 
 from env import GameEnv
-
-Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
-
-
-class ReplayMemory(object):
-
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.memory = []
-        self.position = 0
-
-    def push(self, *args):
-        """Saves a transition."""
-        if len(self.memory) < self.capacity:
-            self.memory.append(None)
-        self.memory[self.position] = Transition(*args)
-        self.position = (self.position + 1) % self.capacity
-
-    def sample(self, batch_size):
-        return random.sample(self.memory, batch_size)
-
-    def __len__(self):
-        return len(self.memory)
+from replay_memory import ReplayMemory, Transition
 
 
 class Trainer(object):
@@ -41,11 +16,10 @@ class Trainer(object):
                  env: GameEnv, model=None,
                  optimizer_klass=None, optimizer_params: Optional[Dict] = None,
                  loss_f=None, loss_params: Optional[Dict] = None,
-                 is_ipython=False, writer: SummaryWriter = None):
+                 is_ipython=False):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(self.device)
         self.is_ipython = is_ipython
-        self.writer = writer
 
         self.BATCH_SIZE = batch_size
         self.GAMMA = gamma
@@ -85,8 +59,7 @@ class Trainer(object):
         eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * \
                         math.exp(-1. * self.steps_done / self.EPS_DECAY)
         self.steps_done += 1
-        if self.steps_done % 100 == 0:
-            self.writer.add_scalar("eps_threshold", eps_threshold, int(self.steps_done / 100))
+
         if sample > eps_threshold:
             with torch.no_grad():
                 # t.max(1) will return largest column value of each row.
@@ -203,12 +176,4 @@ class Trainer(object):
         return torch.tensor(self.highest_scores).numpy()
 
     def write_results(self, save_img):
-        if self.writer is not None:
-            counter = {str(k): v for k, v in dict(Counter(self.get_highest_scores())).items()}
-            self.writer.add_hparams(
-                {"batch_size": self.BATCH_SIZE, "gamma": self.GAMMA, "eps_start": self.EPS_START,
-                 "eps_end": self.EPS_END,
-                 "eps_decay": self.EPS_DECAY, "target_update": self.TARGET_UPDATE, **self.optimizer_params},
-                counter)
-
         self.plot_scores(save=save_img)

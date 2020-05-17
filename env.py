@@ -1,14 +1,9 @@
 import sys
-from typing import Tuple
 
 import gym
+import numpy as np
 from gym import spaces
 from gym.utils import seeding
-import numpy as np
-
-
-class IllegalMove(Exception):
-    pass
 
 
 class GameEnv(gym.Env):
@@ -18,7 +13,7 @@ class GameEnv(gym.Env):
     UP = 2
     DOWN = 3
 
-    def __init__(self, dim=4, seed=None):
+    def __init__(self, dim=4, seed=None, reward_class=None):
         self.size = dim
         self.action_space = spaces.Discrete(4)
 
@@ -27,6 +22,7 @@ class GameEnv(gym.Env):
         self.reward_range = (0., float(2 ** squares))
         self.seed(seed=seed)
         self.reset()
+        self.reward_class = reward_class
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -39,12 +35,12 @@ class GameEnv(gym.Env):
             self._add_tile()
             done = self._game_finished()
             if done:
-                reward = GameEnv.final_state_reward(score)
+                reward = self.reward_class.final_state_reward(score)
             else:
                 reward = score
         except IllegalMove as e:
             done = False
-            reward = GameEnv.invalid_move_reward()
+            reward = self.reward_class.invalid_move_reward()
 
         observation = self.board
         info = {"max_tile": self.highest()}
@@ -73,24 +69,21 @@ class GameEnv(gym.Env):
         return outfile
 
     def _add_tile(self):
-        try:
-            possible_values = np.array([2, 4])
-            tile_probabilities = np.array([0.9, 0.1])
-            val = np.random.choice(possible_values, 1, p=tile_probabilities)[0]
-            empty_tiles = self._empty_tiles()
-            choice = np.random.choice(empty_tiles.shape[0])
-            choice = empty_tiles[choice]
+        possible_values = np.array([2, 4])
+        tile_probabilities = np.array([0.9, 0.1])
+        val = np.random.choice(possible_values, 1, p=tile_probabilities)[0]
+        empty_tiles = self._empty_tiles()
+        choice = np.random.choice(empty_tiles.shape[0])
+        choice = empty_tiles[choice]
 
-            self.board[choice[0]][choice[1]] = val
-        except Exception as e:
-            return False
+        self.board[choice[0]][choice[1]] = val
 
     def _empty_tiles(self):
         return np.argwhere(self.board == 0)
 
     def _move(self, direction, test=False):
         changed = False
-        move_score = 0
+        move_score = 0.
 
         self._flip_board(direction)
 
@@ -132,7 +125,7 @@ class GameEnv(gym.Env):
             # combine tiles
             if value_pair[0] == value_pair[1]:
                 new_line[index] += value_pair[1]
-                move_score += GameEnv.reward_function(value_pair)  # min(value_pair[0] / 4., 1.)
+                move_score += self.reward_class.reward_function(value_pair)
                 skip = True
 
             index += 1
@@ -140,18 +133,6 @@ class GameEnv(gym.Env):
             new_line[index] = tiles[-1]
 
         return (new_line, move_score, (new_line != board_line).any())
-
-    @staticmethod
-    def reward_function(value_pair: Tuple) -> float:
-        raise NotImplementedError
-
-    @staticmethod
-    def final_state_reward(score=None) -> float:
-        raise NotImplementedError
-
-    @staticmethod
-    def invalid_move_reward() -> float:
-        raise NotImplementedError
 
     def _flip_board(self, direction: int):
         if direction == self.LEFT:
@@ -165,3 +146,7 @@ class GameEnv(gym.Env):
 
     def highest(self):
         return np.max(self.board)
+
+
+class IllegalMove(Exception):
+    pass
