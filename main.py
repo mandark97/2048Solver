@@ -1,6 +1,5 @@
 # Imports
 # %matplotlib inline
-# %%
 from collections import Counter
 from types import MethodType
 from typing import Tuple
@@ -17,7 +16,6 @@ from rewards import Reward1
 from trainer import Trainer
 from networks import DQN
 
-# %%
 is_ipython = 'inline' in matplotlib.get_backend()
 if is_ipython:
     from IPython import display
@@ -25,10 +23,7 @@ plt.ion()
 
 env = GameEnv(reward_class=Reward1)
 
-# %%
 
-
-# %%
 # define transformation function
 def get_state(self: Trainer):
     with np.errstate(divide='ignore'):
@@ -44,9 +39,8 @@ def state2(self: Trainer):
     return torch.from_numpy(np.ascontiguousarray(board)).unsqueeze(0).float().to(self.device)
 
 
-# %%
 # define constants
-num_episodes = 3000
+num_episodes = 1000
 BATCH_SIZE = 256
 GAMMA = 0.999
 EPS_START = 1.
@@ -56,20 +50,15 @@ TARGET_UPDATE = 50
 MEMORY_SIZE = 10000
 optimizer = optim.Adam
 optimizer_params = {"lr": 0.0001}
-# %%
 # define trainer
 trainer = Trainer(memory_size=MEMORY_SIZE, batch_size=BATCH_SIZE, gamma=GAMMA, eps_start=EPS_START, eps_end=EPS_END,
                   eps_decay=EPS_DECAY, target_update=TARGET_UPDATE, env=env, model=DQN, optimizer_klass=optimizer,
                   optimizer_params=optimizer_params,
-                  loss_f=F.smooth_l1_loss, is_ipython=is_ipython)
+                  loss_f=F.smooth_l1_loss, is_ipython=is_ipython, log_dir="run1")
 
-# %%
 # assign state method
 trainer.get_state = MethodType(state2, trainer)
 
-# %%
 # train
 trainer.train(num_episodes)
-
-# %%
-print(Counter(trainer.get_highest_scores()))
+trainer.write_results()

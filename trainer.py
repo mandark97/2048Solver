@@ -1,11 +1,14 @@
 import math
 import random
+import json
 from itertools import count
 from typing import Optional, Dict
-
+import torch
+import os
 import matplotlib.pyplot as plt
 import torch
 from IPython import display
+from collections import Counter
 
 from env import GameEnv
 from replay_memory import ReplayMemory, Transition
@@ -16,10 +19,12 @@ class Trainer(object):
                  env: GameEnv, model=None,
                  optimizer_klass=None, optimizer_params: Optional[Dict] = None,
                  loss_f=None, loss_params: Optional[Dict] = None,
-                 is_ipython=False):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                 is_ipython=False, log_dir: str = None):
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu")
         print(self.device)
         self.is_ipython = is_ipython
+        self.log_dir = log_dir
 
         self.BATCH_SIZE = batch_size
         self.GAMMA = gamma
@@ -40,7 +45,8 @@ class Trainer(object):
         self.init_models(model)
 
         self.optimizer_params = optimizer_params or {}
-        self.optimizer = optimizer_klass(self.policy_net.parameters(), **self.optimizer_params)
+        self.optimizer = optimizer_klass(
+            self.policy_net.parameters(), **self.optimizer_params)
 
         if loss_params is None:
             loss_params = {}
@@ -57,7 +63,7 @@ class Trainer(object):
     def select_action(self, state):
         sample = random.random()
         eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * \
-                        math.exp(-1. * self.steps_done / self.EPS_DECAY)
+            math.exp(-1. * self.steps_done / self.EPS_DECAY)
         self.steps_done += 1
 
         if sample > eps_threshold:
@@ -72,24 +78,25 @@ class Trainer(object):
     def plot_scores(self, save=None):
         plt.figure(2)
         plt.clf()
-        durations_t = torch.tensor(self.episode_scores, dtype=torch.float)
+        scores_t = torch.tensor(self.episode_scores, dtype=torch.float)
         plt.title('Training...')
         plt.xlabel('Episode')
-        plt.ylabel('Duration')
-        plt.plot(durations_t.numpy())
+        plt.ylabel('Scores')
+        plt.plot(scores_t.numpy())
         # Take 100 episode averages and plot them too
-        if len(durations_t) >= 100:
-            means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
+        if len(scores_t) >= 100:
+            means = scores_t.unfold(0, 100, 1).mean(1).view(-1)
             means = torch.cat((torch.zeros(99), means))
             plt.plot(means.numpy())
 
+        if save is not None:
+            plt.savefig(save, dpi=300, bbox_inches='tight')
+
         plt.pause(0.001)  # pause a bit so that plots are updated
+
         if self.is_ipython:
             display.clear_output(wait=True)
             # display.display(plt.gcf())
-
-        if save is not None:
-            plt.savefig(f"{save}.png")
 
     def optimize_model(self):
         if len(self.memory) < self.BATCH_SIZE:
@@ -113,7 +120,8 @@ class Trainer(object):
         # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
         # columns of actions taken. These are the actions which would've been taken
         # for each batch state according to policy_net
-        state_action_values = self.policy_net(state_batch).gather(1, action_batch)
+        state_action_values = self.policy_net(
+            state_batch).gather(1, action_batch)
 
         # Compute V(s_{t+1}) for all next states.
         # Expected values of actions for non_final_next_states are computed based
@@ -121,12 +129,15 @@ class Trainer(object):
         # This is merged based on the mask, such that we'll have either the expected
         # state value or 0 in case the state was final.
         next_state_values = torch.zeros(self.BATCH_SIZE, device=self.device)
-        next_state_values[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].detach()
+        next_state_values[non_final_mask] = self.next_state_action(
+            non_final_next_states)
         # Compute the expected Q values
-        expected_state_action_values = (next_state_values * self.GAMMA) + reward_batch
+        expected_state_action_values = (
+            next_state_values * self.GAMMA) + reward_batch
 
         # Compute Huber loss
-        loss = self.loss(state_action_values, expected_state_action_values.unsqueeze(1), **self.loss_params)
+        loss = self.loss(state_action_values, expected_state_action_values.unsqueeze(
+            1), **self.loss_params)
 
         # Optimize the model
         self.optimizer.zero_grad()
@@ -172,8 +183,34 @@ class Trainer(object):
 
         self.env.close()
 
+    def next_state_action(self, non_final_next_states):
+        return self.target_net(non_final_next_states).max(1)[0].detach()
+
     def get_highest_scores(self):
         return torch.tensor(self.highest_scores).numpy()
 
-    def write_results(self, save_img):
-        self.plot_scores(save=save_img)
+    def write_results(self):
+        try:
+            os.makedirs(self.log_dir)
+        except OSError:
+            pass
+        self.plot_scores(save=f"{self.log_dir}/plot.png")
+        torch.save(self.target_net, f"{self.log_dir}/target.pt")
+        torch.save(self.policy_net, f"{self.log_dir}/policy.pt")
+
+        with open(f"{self.log_dir}/highest_scores.json", "w") as json_file:
+            scores = {str(k): v for k, v in Counter(
+                self.get_highest_scores()).items()}
+            json.dump(scores, json_file)
+
+        with open(f"{self.log_dir}/train_params.json", "w") as json_file:
+            params = {
+                "batch_size": self.BATCH_SIZE,
+                "gamma": self.GAMMA,
+                "eps_start": self.EPS_START,
+                "eps_end": self.EPS_END,
+                "eps_decay": self.EPS_DECAY,
+                "target_update": self.TARGET_UPDATE,
+                **self.loss_params
+            }
+            json.dump(params, json_file)
