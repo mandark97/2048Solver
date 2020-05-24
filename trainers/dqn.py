@@ -1,10 +1,10 @@
-import math
-import random
 import json
 from itertools import count
 from typing import Optional, Dict
 import torch
 import os
+import random
+import math
 import matplotlib.pyplot as plt
 import torch
 from IPython import display
@@ -14,9 +14,9 @@ from env import GameEnv
 from replay_memory import ReplayMemory, Transition
 
 
-class Trainer(object):
+class DQNTrainer(object):
     def __init__(self, memory_size, batch_size, gamma, eps_start, eps_end, eps_decay, target_update,
-                 env: GameEnv, model=None,
+                 env: GameEnv, model=None, input_shape=None,
                  optimizer_klass=None, optimizer_params: Optional[Dict] = None,
                  loss_f=None, loss_params: Optional[Dict] = None,
                  is_ipython=False, log_dir: str = None):
@@ -36,13 +36,13 @@ class Trainer(object):
         self.env = env
         self.env.reset()
         self.memory = ReplayMemory(memory_size)
-        self.get_state = None
+        self.get_state = None # added method from main for state processing
 
         self.steps_done = 0
         self.episode_scores = []
         self.highest_scores = []
 
-        self.init_models(model)
+        self.init_models(model, input_shape)
 
         self.optimizer_params = optimizer_params or {}
         self.optimizer = optimizer_klass(
@@ -53,10 +53,10 @@ class Trainer(object):
         self.loss = loss_f
         self.loss_params = loss_params
 
-    def init_models(self, model):
+    def init_models(self, model, input_shape):
         self.n_actions = self.env.action_space.n
-        self.target_net = model(self.n_actions).to(self.device)
-        self.policy_net = model(self.n_actions).to(self.device)
+        self.policy_net = model(input_shape, self.n_actions).to(self.device)
+        self.target_net = model(input_shape, self.n_actions).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
 
