@@ -1,6 +1,7 @@
 import sys
 
 import gym
+import matplotlib.pyplot as plt
 import numpy as np
 from gym import spaces
 from gym.utils import seeding
@@ -18,7 +19,8 @@ class GameEnv(gym.Env):
         self.action_space = spaces.Discrete(4)
 
         squares = self.size * self.size
-        self.observation_space = spaces.Box(0, 2 ** squares, (self.size, self.size,), dtype=np.int)
+        self.observation_space = spaces.Box(
+            0, 2 ** squares, (self.size, self.size,), dtype=np.int)
         self.reward_range = (0., float(2 ** squares))
         self.seed(seed=seed)
         self.reset()
@@ -68,6 +70,16 @@ class GameEnv(gym.Env):
         outfile.write(s)
         return outfile
 
+    def plot(self):
+        plt.clf()
+        fig, ax = plt.subplots()
+        im = ax.matshow(self.board, cmap='tab10')
+        for i in range(self.size):
+            for j in range(self.size):
+                text = ax.text(j, i, self.board[i, j],
+                               ha="center", va="center", color="w")
+        plt.show()
+
     def _add_tile(self):
         possible_values = np.array([2, 4])
         tile_probabilities = np.array([0.9, 0.1])
@@ -94,11 +106,11 @@ class GameEnv(gym.Env):
             move_score += line_score
             changed |= line_changed
 
-        self._flip_board(direction)
+        self._rev_flip_board(direction)
         if not changed:
             raise IllegalMove
 
-        return move_score, changed
+        return self.reward_class.reward_function(move_score), changed
 
     def _game_finished(self) -> bool:
         for direction in range(4):
@@ -125,7 +137,8 @@ class GameEnv(gym.Env):
             # combine tiles
             if value_pair[0] == value_pair[1]:
                 new_line[index] += value_pair[1]
-                move_score += self.reward_class.reward_function(value_pair)
+                # np.log2(value_pair[0]) # 1 #number of tiles merged
+                move_score += self.reward_class.tile_merge_reward(value_pair)
                 skip = True
 
             index += 1
@@ -135,6 +148,16 @@ class GameEnv(gym.Env):
         return (new_line, move_score, (new_line != board_line).any())
 
     def _flip_board(self, direction: int):
+        if direction == self.LEFT:
+            pass
+        elif direction == self.RIGHT:
+            self.board = np.flip(self.board, 1)
+        elif direction == self.UP:
+            self.board = self.board.T
+        elif direction == self.DOWN:
+            self.board = np.flip(self.board, 0).T
+
+    def _rev_flip_board(self, direction: int):
         if direction == self.LEFT:
             pass
         elif direction == self.RIGHT:

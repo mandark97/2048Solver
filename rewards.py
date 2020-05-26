@@ -1,48 +1,34 @@
 from typing import Tuple
+import numpy as np
 
-
-class Reward(object):
+class Reward1():
     @staticmethod
-    def reward_function(value_pair: Tuple) -> float:
-        raise NotImplementedError
+    def reward_function(score) -> float:
+        return score / 80
 
     @staticmethod
-    def final_state_reward(score=None) -> float:
-        raise NotImplementedError
+    def final_state_reward(score: float = None) -> float:
+        return -1.
 
     @staticmethod
     def invalid_move_reward() -> float:
-        raise NotImplementedError
+        return 0.
 
-
-class Reward1(Reward):
+class Reward3():
     @staticmethod
     def reward_function(value_pair: Tuple) -> float:
         return min(value_pair[0] / 4., 1.)
 
     @staticmethod
     def final_state_reward(score: float = None) -> float:
-        return score
-
-    @staticmethod
-    def invalid_move_reward() -> float:
-        return 0.
-
-class Reward3(Reward):
-    @staticmethod
-    def reward_function(value_pair: Tuple) -> float:
-        return min(value_pair[0] / 4., 1.)
-
-    @staticmethod
-    def final_state_reward(score: float = None) -> float:
-        return -1
+        return -1.
 
     @staticmethod
     def invalid_move_reward() -> float:
         return 0.
 
 
-class Reward2(Reward):
+class Reward2():
     @staticmethod
     def reward_function(value_pair: Tuple) -> float:
         return min(value_pair[0] / 4., 1.)

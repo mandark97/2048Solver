@@ -36,7 +36,7 @@ class DQNTrainer(object):
         self.env = env
         self.env.reset()
         self.memory = ReplayMemory(memory_size)
-        self.get_state = None # added method from main for state processing
+        self.get_state = None  # added method from main for state processing
 
         self.steps_done = 0
         self.episode_scores = []
@@ -187,7 +187,7 @@ class DQNTrainer(object):
         return self.target_net(non_final_next_states).max(1)[0].detach()
 
     def get_highest_scores(self):
-        return torch.tensor(self.highest_scores).numpy()
+        return self.highest_scores
 
     def write_results(self):
         try:
